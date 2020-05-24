@@ -68,7 +68,7 @@ PickingTeam.prototype.gameMove = function (socket, buttonPressed, selectedPlayer
         this.thisRoom.VHUpdateTeamPick();
 
         if ( this.thisRoom.pickNum === 5 ) {
-            this.thisRoom.phase = 'pickingTeam';
+            this.thisRoom.phase = 'votingMission';
         } else {
             this.thisRoom.phase = 'votingTeam';
         }
