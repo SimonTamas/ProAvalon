@@ -8,6 +8,10 @@ class Morgana {
 
         this.description = 'A spy who looks like Merlin to Percival.';
         this.orderPriorityInOptions = 70;
+
+        this.playerShot = '';
+        this.playerShot2 = '';
+        this.specialPhase = 'assassination';
     }
 
     // Morgana sees all spies except oberon
