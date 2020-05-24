@@ -23,6 +23,7 @@ LancelotSwitch.prototype.gameMove = function (socket, buttonPressed, selectedPla
             } else if ( isPlayerBadLancelot ) {
                 socket.emit('danger-alert', 'You are Bad Lancelot again! You will stay bad for the rest of the game!');
             }
+            socket.emit('info-alert', 'Lancelots have switched again. They are now and will remain their original roles.');
             this.thisRoom.sendText(this.thisRoom.allSockets, `Lancelots have switched again. They are now and will remain their original roles.`, 'gameplay-text-red');
         } else {
             if ( isPlayerGoodLancelot ) {
@@ -30,10 +31,12 @@ LancelotSwitch.prototype.gameMove = function (socket, buttonPressed, selectedPla
             } else if ( isPlayerBadLancelot ) {
                 socket.emit('danger-alert', 'You are now Good Lancelot! You MUST succeed missions from now on!');
             }
+            socket.emit('info-alert', 'Lancelots have switched. If you were bad you are now good and visa versa.');
             this.thisRoom.sendText(this.thisRoom.allSockets, `Lancelots have switched. If you were bad you are now good and visa versa.`, 'gameplay-text-red');
         }
         this.thisRoom.lancelotsSwitched = !this.thisRoom.lancelotsSwitched;
     } else {
+        socket.emit('info-alert', 'Lancelots have not switched.');
         this.thisRoom.sendText(this.thisRoom.allSockets, `Lancelots have not switched.`, 'gameplay-text-blue');
     }
 
