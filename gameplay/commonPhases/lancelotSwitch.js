@@ -26,7 +26,7 @@ LancelotSwitch.prototype.gameMove = function (socket, buttonPressed, selectedPla
             this.thisRoom.sendText(this.thisRoom.allSockets, `Lancelots have switched again. They are now and will remain their original roles.`, 'gameplay-text-red');
         } else {
             if ( isPlayerGoodLancelot ) {
-                socket.emit('danger-alert', 'You are now Bad Lancelot! You MUST fail mission from now on!');
+                socket.emit('danger-alert', 'You are now Bad Lancelot! You MUST fail missions from now on!');
             } else if ( isPlayerBadLancelot ) {
                 socket.emit('danger-alert', 'You are now Good Lancelot! You MUST succeed missions from now on!');
             }
