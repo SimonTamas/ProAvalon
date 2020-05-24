@@ -42,7 +42,7 @@ for (let i = 0; i < gameModeNames.length; i++) {
  * @param {String} newRoomPassword_ Password to join the room
  * @param {String} gameMode_ Gamemode - avalon/hunter/etc.
  */
-function Game(host_, roomId_, io_, maxNumPlayers_, newRoomPassword_, gameMode_, ranked_, callback_) {
+function Game(host_, roomId_, io_, maxNumPlayers_, newRoomPassword_, gameMode_, callback_) {
     this.callback = callback_;
     //* *******************************
     // CONSTANTS
@@ -71,7 +71,7 @@ function Game(host_, roomId_, io_, maxNumPlayers_, newRoomPassword_, gameMode_, 
     ];
 
     // Get the Room properties
-    Room.call(this, host_, roomId_, io_, maxNumPlayers_, newRoomPassword_, gameMode_, ranked_);
+    Room.call(this, host_, roomId_, io_, maxNumPlayers_, newRoomPassword_, gameMode_);
     PlayersReadyNotReady.call(this, this.minPlayers);
 
     const thisRoom = this;
@@ -386,6 +386,9 @@ Game.prototype.startGame = function (options) {
     this.resRoles = [];
     this.spyRoles = [];
 
+    this.lancelotsSwitched = false;
+    this.lancelotSwitches = shuffleArray([1,0,0,0,1]);
+
     for (var i = 0; i < options.length; i++) {
         const op = options[i].toLowerCase();
         // console.log(op);
@@ -441,6 +444,7 @@ Game.prototype.startGame = function (options) {
     // for those players with no role, set their role to their alliance (i.e. for Resistance VT and Spy VS)
     for (var i = 0; i < this.playersInGame.length; i++) {
         // console.log(this.playersInGame[i].role);
+        this.playersInGame[i].roleFlipped = false;
         if (this.playersInGame[i].role === undefined) {
             this.playersInGame[i].role = this.playersInGame[i].alliance;
             // console.log("Overwrite role as alliance for player: " + this.playersInGame[i].username);
@@ -1198,64 +1202,6 @@ Game.prototype.finishGame = function (toBeWinner) {
     });
 
     if (botUsernames.length === 0) {
-        // Check if the game contains any provisional players.
-        var provisionalGame = false;
-        if (this.playersInGame.filter(soc => soc.request.user.ratingBracket === 'unranked').length > 0){
-            provisionalGame = true;
-        }
-
-        // calculate team 1v1 elo adjustment
-        const teamResChange = this.calculateResistanceRatingChange(this.winner, provisionalGame);
-        const teamSpyChange = -teamResChange;
-
-        // individual changes per player, to one decimal place.
-        const indResChange = Math.round(teamResChange/this.resistanceUsernames.length * 10)/10;
-        const indSpyChange = Math.round(teamSpyChange/this.spyUsernames.length * 10)/10;
-        
-        // if we're in a ranked game show the elo adjustments
-        if (this.ranked) {
-            // Get the old player ratings (with usernames) for use in provisional calculations.
-            oldPlayersInfo = this.playersInGame.map(soc => {
-                data = {};
-                data.username = soc.request.user.username;
-                data.rating = soc.request.user.playerRating;
-                return data;
-            });
-
-            // Broadcast elo adjustments in chat first, if broadcasted in the updating process, its slow
-            this.sendText(this.allSockets, 'Rating Adjustments:', 'server-text');
-            this.playersInGame.forEach((player) => {
-                const rating = player.request.user.playerRating;
-                // If player is provisional, different adjustment.
-                if (player.request.user.ratingBracket === 'unranked') {
-                    // Ensure this value is changed in time for the callbacks, requires a refresh to get the actual db value.
-                    player.request.user.totalRankedGamesPlayed += 1;
-
-                    // If there are multiple provisional players, use all ratings, otherwise just the other players' ratings.
-                    if (this.playersInGame.filter(soc => soc.request.user.ratingBracket === 'unranked').length > 1) {
-                        playerRatings = oldPlayersInfo.map(data => data.rating);
-                        player.request.user.playerRating = this.calculateNewProvisionalRating(this.winner, player, playerRatings);
-                    }
-                    else {
-                        otherPlayerRatings = oldPlayersInfo.filter(data => !(data.username === player.request.user.username)).map(data => data.rating);
-                        player.request.user.playerRating = this.calculateNewProvisionalRating(this.winner, player, otherPlayerRatings);
-                    }
-                    difference = Math.round((player.request.user.playerRating - rating)*10)/10;
-                    this.sendText(this.allSockets, `${player.request.user.username}: ${Math.floor(rating)} -> ${Math.floor(player.request.user.playerRating)} (${(difference > 0 ? "+"+difference : difference)})`, 'server-text');
-                }
-                else {
-                    if (player.alliance === 'Resistance') {
-                        this.sendText(this.allSockets, `${player.request.user.username}: ${Math.floor(rating)} -> ${Math.floor(rating + indResChange)} (${(indResChange > 0 ? "+"+indResChange : indResChange)})`, 'server-text');
-                        player.request.user.playerRating += indResChange;
-                    }
-                    else if (player.alliance === 'Spy') {
-                        this.sendText(this.allSockets, `${player.request.user.username}: ${Math.floor(rating)} -> ${Math.floor(rating + indSpyChange)} (${(indSpyChange > 0 ? "+"+indSpyChange : indSpyChange)})`, 'server-text');
-                        player.request.user.playerRating += indSpyChange;
-                    }
-                }
-            });
-        }
-
         this.playersInGame.forEach((player) => {
             User.findById(player.userId).populate('notifications').exec((err, foundUser) => {
                 if (err) { console.log(err); } else if (foundUser) {
@@ -1274,22 +1220,6 @@ Game.prototype.finishGame = function (toBeWinner) {
                         foundUser.totalLosses += 1;
                         if (winnerVar === 'Spy') {
                             foundUser.totalResLosses += 1;
-                        }
-                    }
-
-                    // if ranked, update player ratings and increase ranked games played
-                    if (this.ranked) {
-                        foundUser.totalRankedGamesPlayed += 1;
-                        if (foundUser.ratingBracket === 'unranked') {
-                            foundUser.playerRating = player.request.user.playerRating;
-                        }
-                        else {
-                            if (player.alliance === 'Resistance') {
-                                foundUser.playerRating += indResChange;
-                            }
-                            else if (player.alliance === 'Spy') {
-                                foundUser.playerRating += indSpyChange;
-                            }
                         }
                     }
 
@@ -1530,137 +1460,6 @@ Game.prototype.togglePause = function (modUsername) {
     }
 };
 
-/*
-ELO RATING CALCULATION:
-
-Usual formula: R_new = R_old + k(Actual - Expected)
-
-1. Use average team rating and pit together in a 1v1 format.
-2. Adjust ratings for Res and Spy winrates (constant adjustment based on site winrates, maybe for that player size).
-2. Using k-value k=38, calculate adjustment amount = k(Actual - Expected)
-    a. Actual = 1 for win, 0 for loss
-    b. Expected = 1/(1 + 10^-(R_old - R_opp)/400)
-3. Multiplicative adjustment based on player size.
-4. If provisional players are in the game, adjust the elo changes based on how close they are to being experienced.
-5. Divide equally between players on each team and adjust ratings. (Done in the finishGame function)
-*/
-Game.prototype.calculateResistanceRatingChange = function (winningTeam, provisionalGame) {
-    // Constant changes in elo due to unbalanced winrate, winrate changes translated to elo points.
-    const playerSizeEloChanges = [62, 56, 71, 116, 18, 80]
-    // k value parameter for calculation
-    const k = 42;
-    // Calculate ratings for each team by averaging elo of players
-    resTeamEloRatings = this.playersInGame.filter(soc => soc.alliance === 'Resistance').map(soc => soc.request.user.playerRating)
-    spyTeamEloRatings = this.playersInGame.filter(soc => soc.alliance === 'Spy').map(soc => soc.request.user.playerRating)
-
-    var total = 0;
-    for(var i=0; i < resTeamEloRatings.length; i++) {
-        total += resTeamEloRatings[i];
-    }
-    var resElo = total/resTeamEloRatings.length;
-
-    total = 0
-    for(var i=0; i < spyTeamEloRatings.length; i++) {
-        total += spyTeamEloRatings[i];
-    }
-    var spyElo = total/spyTeamEloRatings.length;
-
-    // Adjust ratings for sitewide winrates. Using hardcoded based on current.    
-    spyElo += playerSizeEloChanges[this.playersInGame.length-5];
-    
-    console.log("Resistance Team Elo: " + resElo);
-    console.log("Spy Team Elo: " + spyElo);
-
-    // Calculate elo change, adjusting for player size, difference is 1- or just -
-    var eloChange = 0;
-    if (winningTeam === 'Resistance') {
-        eloChange = k * (1 - (1/(1+Math.pow(10, -(resElo - spyElo)/500)))) * (this.playersInGame.length/5); //smoothed from 400 to 500 division
-    }
-    else if (winningTeam === 'Spy') {
-        eloChange = k * (-1/(1+Math.pow(10, -(resElo - spyElo)/500))) * (this.playersInGame.length/5); //smoothed from 400 to 500 division
-    }
-    else {
-        // winning team should always be defined
-        this.sendText(this.allSockets, 'Error in elo calculation, no winning team specified.', 'server-text');
-        return;
-    }
-
-    // If the game is provisional, apply a multiplicative reduction in elo change based on how experienced the players are.
-    if (provisionalGame) {
-        provisionalPlayers = this.playersInGame.filter(soc => soc.request.user.ratingBracket === 'unranked');
-        var totalProvisionalGames = 0;
-        for (i=0; i < provisionalPlayers.length; i++) {
-            totalProvisionalGames += provisionalPlayers[i].request.user.totalRankedGamesPlayed;
-        }
-        eloChange = ((totalProvisionalGames+(this.playersInGame.length-provisionalPlayers.length)*this.provisionalGamesRequired)/(this.provisionalGamesRequired*this.playersInGame.length)) * eloChange;
-    }
-    return eloChange;
-};
-
-/*
-PROVISIONAL ELO RATING CALCULATION:
-
-If there is only one provisional player in the game:
-Formula: R_new = (R_old*N_old + sum(otherPlayerRatings)/numOtherPlayers + 200*TeamAdjustment*Result)/(N_old+1)
-    where N_old = Number of games played
-          Result = 1 for win, 0 for loss
-
-If there is more than one provisional player in the game:
-Formula: R_new = (R_old*N_old + sum(allPlayerRatings)/numPlayers + 200*TeamAdjustment*Result)/(N_old+1)
-    where N_old = Number of games played
-          Result = 1 for win, 0 for loss
-
-This rating style takes into account all the ratings of the players in the games that you play with to determine your starting point.
-For the first few games it will result in wild rating changes, but will level out towards the end of the provisional section.
-Could possibly lead to some people abusing their early rating by only playing with strong players and getting lucky, but should level out in the end.
-*/
-Game.prototype.calculateNewProvisionalRating = function (winningTeam, playerSocket, playerRatings) {
-    // Constant changes in elo due to unbalanced winrate, winrate changes translated to elo points.
-    const playerSizeWinrates = [0.57, 0.565, 0.58, 0.63, 0.52, 0.59]
-    var Result = (playerSocket.alliance === winningTeam) ? 1 : -1;
-    
-    // Calculate new rating
-    const R_old = playerSocket.request.user.playerRating;
-    const N_old = playerSocket.request.user.totalRankedGamesPlayed;
-    const ratingsSum = playerRatings.reduce((sum, a) => sum+a,0);
-
-    // Prototype team adjustment is hardcoded, players are rewarded more for winning and penalised less for losing as res.
-    // Also all changes are scaled with relation to team size to prevent deflation in provisional games.
-    var teamAdj = 0;
-    const resReduction = this.spyUsernames.length/this.resistanceUsernames.length;
-    const sizeWinrate = playerSizeWinrates[this.playersInGame.length-5];
-    if (playerSocket.alliance === "Resistance") {
-        if (winningTeam === playerSocket.alliance) {
-            teamAdj = sizeWinrate/(1-sizeWinrate) * resReduction;
-        }
-        else {
-            teamAdj = resReduction;
-        }
-    }
-    else {
-        if (winningTeam === playerSocket.alliance) {
-            teamAdj = 1;
-        }
-        else {
-            teamAdj = sizeWinrate/(1-sizeWinrate);
-        }
-    }
-
-    var newRating = (R_old*N_old + (ratingsSum/playerRatings.length) + 200*teamAdj*Result)/(N_old+1)
-
-    // Prevent losing rating on win and gaining rating on loss in fringe scenarios with weird players.
-    if ((winningTeam === playerSocket.alliance && newRating < R_old) || (!(winningTeam === playerSocket.alliance) && newRating > R_old)) {
-        newRating = R_old;
-    }
-    if ((winningTeam === playerSocket.alliance && newRating > R_old+100)) {
-        newRating = R_old + 100;
-    }
-    if ((!(winningTeam === playerSocket.alliance) && newRating < R_old-100)) {
-        newRating = R_old - 100;
-    }
-    return newRating
-};
-
 module.exports = Game;
 
 
@@ -1782,3 +1581,13 @@ var reverseMapFromMap = function (map, f) {
         return acc;
     }, {});
 };
+
+function shuffleArray(array) {
+    for (var i = array.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+    return array;
+}

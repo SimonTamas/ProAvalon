@@ -22,6 +22,10 @@ class Mordred {
                         // don't add oberon
                     } else {
                         // add the spy
+                        if ( this.thisRoom.playersInGame[i].role === 'Bad Lancelot' ) {
+                            obj[this.thisRoom.playersInGame[i].username] = {};
+                            obj[this.thisRoom.playersInGame[i].username].roleTag = 'Bad Lancelot';
+                        }
                         array.push(this.thisRoom.playersInGame[i].username);
                     }
                 }

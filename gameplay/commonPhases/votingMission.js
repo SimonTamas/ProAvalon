@@ -13,14 +13,28 @@ VotingMission.prototype.gameMove = function (socket, buttonPressed, selectedPlay
     // if this.thisRoom vote is coming from someone who hasn't voted yet
     if (i !== -1) {
         if (buttonPressed === 'yes') {
+            const index = usernamesIndexes.getIndexFromUsername(this.thisRoom.playersInGame, socket.request.user.username);
+            if (index !== -1 && (this.thisRoom.playersInGame[index].role === 'Bad Lancelot' && !this.thisRoom.lancelotsSwitched) || (this.thisRoom.playersInGame[index].role === 'Good Lancelot' && this.thisRoom.lancelotsSwitched)) {
+                if ( this.thisRoom.lancelotsSwitched ) {
+                    socket.emit('danger-alert', 'You are Good Lancelot turned Bad! You MUST fail!');
+                } else {
+                    socket.emit('danger-alert', 'You are Bad Lancelot! You MUST fail!');
+                }
+                return;
+            }
             this.thisRoom.missionVotes[usernamesIndexes.getIndexFromUsername(this.thisRoom.playersInGame, socket.request.user.username)] = 'succeed';
             // console.log("received succeed from " + socket.request.user.username);
         } else if (buttonPressed === 'no') {
             // If the user is a res, they shouldn't be allowed to fail
             const index = usernamesIndexes.getIndexFromUsername(this.thisRoom.playersInGame, socket.request.user.username);
-            if (index !== -1 && this.thisRoom.playersInGame[index].alliance === 'Resistance') {
-                socket.emit('danger-alert', 'You are resistance! Surely you want to succeed!');
-                return;
+            if (index !== -1) {
+                if ( this.thisRoom.playersInGame[index].role === 'Bad Lancelot' && this.thisRoom.lancelotsSwitched ) {
+                    socket.emit('danger-alert', 'You are Bad Lancelot turned Good! You MUST succeed!');
+                    return;
+                } else if ( this.thisRoom.playersInGame[index].alliance === 'Resistance' && (this.thisRoom.playersInGame[index].role !== 'Good Lancelot' || !this.thisRoom.lancelotsSwitched) ) {
+                    socket.emit('danger-alert', 'You are resistance! Surely you want to succeed!');
+                    return;
+                }
             }
 
             this.thisRoom.missionVotes[usernamesIndexes.getIndexFromUsername(this.thisRoom.playersInGame, socket.request.user.username)] = 'fail';
@@ -101,7 +115,23 @@ VotingMission.prototype.gameMove = function (socket, buttonPressed, selectedPlay
             }
 
             this.thisRoom.hammer = ((this.thisRoom.teamLeader - 5 + 1 + this.thisRoom.playersInGame.length) % this.thisRoom.playersInGame.length);
-            this.thisRoom.phase = 'pickingTeam';
+
+            if ( this.thisRoom.missionNum > 2 ) {
+                let lancelotCount = 0;
+                for (var iL = 0; iL < this.thisRoom.playersInGame.length; iL++) {
+                    if (this.thisRoom.playersInGame[iL].role === 'Bad Lancelot' || this.thisRoom.playersInGame[iL].role === 'Good Lancelot') {
+                        ++lancelotCount;
+                    }
+                }
+                if ( lancelotCount > 1 ) {
+                    this.thisRoom.phase = 'lancelotSwitch';
+                } else {
+                    this.thisRoom.phase = 'pickingTeam';
+                }
+            } else {
+                this.thisRoom.phase = 'pickingTeam';
+            }
+
         }
         this.thisRoom.requireSave = true;
     }
