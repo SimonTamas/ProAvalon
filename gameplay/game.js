@@ -386,6 +386,9 @@ Game.prototype.startGame = function (options) {
     this.resRoles = [];
     this.spyRoles = [];
 
+    this.lancelotsSwitched = false;
+    this.lancelotSwitches = shuffle([1,0,0,0,1]);
+
     for (var i = 0; i < options.length; i++) {
         const op = options[i].toLowerCase();
         // console.log(op);

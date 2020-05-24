@@ -27,6 +27,11 @@ class Assassin {
                     if (this.thisRoom.playersInGame[i].role === 'Oberon') {
                         // don't add oberon
                     } else {
+                        // show bad lancelot
+                        if ( this.thisRoom.playersInGame[i].role === 'Bad Lancelot' ) {
+                            obj[this.thisRoom.playersInGame[i].username] = {};
+                            obj[this.thisRoom.playersInGame[i].username].roleTag = 'Bad Lancelot';
+                        }
                         // add the spy
                         array.push(this.thisRoom.playersInGame[i].username);
                     }
