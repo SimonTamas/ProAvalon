@@ -13,7 +13,14 @@ class Assassination {
         this.thisRoom = thisRoom;
 
         // The role that is the owner of this phase
-        this.role = 'Assassin';
+        var mordredAssassinExists = false;
+        for (var i = 0; i < this.thisRoom.playersInGame.length; i++) {
+            if (this.thisRoom.playersInGame[i].role === 'Mordred Assassin') {
+                mordredAssassinExists = true;
+                break;
+            }
+        }
+        this.role = mordredAssassinExists ? 'Mordred Assassin' : 'Assassin';
 
         this.phase = 'assassination';
         this.showGuns = true;
