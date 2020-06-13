@@ -14,10 +14,13 @@ class Assassination {
 
         // The role that is the owner of this phase
         var mordredAssassinExists = false;
-        for (var i = 0; i < this.thisRoom.playersInGame.length; i++) {
-            if (this.thisRoom.playersInGame[i].role === 'Mordred Assassin') {
-                mordredAssassinExists = true;
-                break;
+        if ( this.thisRoom.playersInGame )
+        {
+            for (var i = 0; i < this.thisRoom.playersInGame.length; i++) {
+                if (this.thisRoom.playersInGame[i].role === 'Mordred Assassin') {
+                    mordredAssassinExists = true;
+                    break;
+                }
             }
         }
         this.role = mordredAssassinExists ? 'Mordred Assassin' : 'Assassin';
