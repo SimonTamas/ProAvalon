@@ -25,7 +25,7 @@ class Merlin {
 
             for (let i = 0; i < this.thisRoom.playersInGame.length; i++) {
                 if (this.thisRoom.playersInGame[i].alliance === 'Spy') {
-                    if (this.thisRoom.playersInGame[i].role === 'Mordred') {
+                    if (this.thisRoom.playersInGame[i].role === 'Assassin') {
                         // don't add mordred for Merlin to see
                     } else {
                         // add the spy
